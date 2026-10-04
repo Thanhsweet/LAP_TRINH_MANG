@@ -105,6 +105,14 @@ def recv_dgram(sock):
     return data, addr, bi_qua_gioi_han
 
 
+def _is_udp_connection_refused(exc: OSError) -> bool:
+    """Nhận diện lỗi từ chối/ICMP Port Unreachable trên Windows và Unix."""
+    error_code = getattr(exc, "winerror", None) or exc.errno
+    return isinstance(exc, (ConnectionRefusedError, ConnectionResetError)) or (
+        error_code in {61, 111, 10054, 10061}
+    )
+
+
 def ask(sock, msg: str, is_match=None, first_timeout: float = 0.5, max_tries: int = 4):
     """
     Cơ chế HẸN GIỜ - GỬI LẠI CÓ GIỚI HẠN cho giao thức chat trên UDP
@@ -126,9 +134,9 @@ def ask(sock, msg: str, is_match=None, first_timeout: float = 0.5, max_tries: in
         FROM|.../SYS|... trong khi đang chờ OK|/ERR| của LOGIN).
 
     Trả về: dòng phản hồi hợp lệ (str).
-    Raise  : TimeoutError nếu đã gửi đủ `max_tries` lần mà không có phản hồi
-             khớp yêu cầu; ConnectionRefusedError nếu hệ điều hành báo cổng
-             đích không có dịch vụ lắng nghe.
+    Raise  : TimeoutError nếu đã gửi đủ `max_tries` lần mà không có bất kỳ
+             phản hồi mạng nào; ConnectionRefusedError nếu nhận được tín hiệu
+             cổng đích từ chối/ICMP Port Unreachable.
     """
     if is_match is None:
         is_match = lambda _line: True  # noqa: E731 - hàm lọc mặc định: nhận mọi dòng
@@ -138,7 +146,14 @@ def ask(sock, msg: str, is_match=None, first_timeout: float = 0.5, max_tries: in
     old_timeout = sock.gettimeout()
     try:
         for attempt in range(1, max_tries + 1):
-            send_dgram(sock, data)
+            try:
+                send_dgram(sock, data)
+            except OSError as exc:
+                if _is_udp_connection_refused(exc):
+                    raise ConnectionRefusedError(
+                        "Máy đích đang hoạt động nhưng cổng UDP từ chối kết nối"
+                    ) from exc
+                raise
 
             deadline = time.monotonic() + timeout
             while True:
@@ -150,22 +165,10 @@ def ask(sock, msg: str, is_match=None, first_timeout: float = 0.5, max_tries: in
                     reply, _addr, _bi_qua_gioi_han = recv_dgram(sock)
                 except socket.timeout:
                     break
-                except ConnectionRefusedError:
-                    raise
-                except ConnectionResetError as exc:
-                    # Socket UDP trên Windows ánh xạ ICMP "port unreachable"
-                    # thành WinError 10054/ConnectionResetError. Đổi sang lỗi
-                    # có đúng ý nghĩa để client báo "Server từ chối kết nối".
-                    raise ConnectionRefusedError(
-                        "Cổng UDP đích không có server lắng nghe"
-                    ) from exc
                 except OSError as exc:
-                    # Một số hệ điều hành/Python trả lỗi cổng đóng dưới dạng
-                    # OSError thuần thay vì lớp ConnectionRefusedError.
-                    error_code = getattr(exc, "winerror", None) or exc.errno
-                    if error_code in {61, 111, 10054, 10061}:
+                    if _is_udp_connection_refused(exc):
                         raise ConnectionRefusedError(
-                            "Cổng UDP đích không có server lắng nghe"
+                            "Máy đích đang hoạt động nhưng cổng UDP từ chối kết nối"
                         ) from exc
                     raise
 

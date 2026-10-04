@@ -121,9 +121,10 @@ def login(sock):
                 f"LOGIN|{name}",
                 is_match=lambda line: line.startswith("OK|") or line.startswith("ERR|"),
             )
-        except ConnectionRefusedError:
+        except ConnectionRefusedError as exc:
             print("Lỗi: Server từ chối kết nối (ConnectionRefusedError) -")
-            print("server chưa bật hoặc sai cổng.")
+            detail = str(exc) or "Địa chỉ/cổng đích từ chối kết nối"
+            print(f"{detail}.")
             return None
         except TimeoutError:
             print("Lỗi: Server không phản hồi sau nhiều lần gửi lại (TimeoutError).")
