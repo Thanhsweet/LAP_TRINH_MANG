@@ -12,7 +12,7 @@ Mô tả: Bài tập 2-3: đóng khung thông điệp TCP dạng dòng văn bả
 import socket
 import time
 
-MAX_LINE = 64 * 1024  # Giới hạn an toàn chống cạn RAM (64 KB) - dùng cho TCP
+MAX_LINE = 64 * 1024
 
 
 def send_msg(sock, data: bytes):

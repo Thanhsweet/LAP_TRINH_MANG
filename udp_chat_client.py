@@ -156,8 +156,8 @@ def dinh_dang_thong_diep(line: str):
             print(f"\n{line}\n> ", end="", flush=True)
     elif line.startswith("SYS|"):
         print(f"\n[HỆ THỐNG] {line.split('|', 1)[1]}\n> ", end="", flush=True)
-    elif line.startswith("PONG|"):
-        pass  # phản hồi nhịp tim - không cần làm phiền người dùng
+    #elif line.startswith("PONG|"):
+        #pass  # phản hồi nhịp tim - không cần làm phiền người dùng
     elif line == "BYE":
         print("\nServer đã xác nhận thoát (BYE).")
     elif line.startswith("OK|") or line.startswith("ERR|"):
